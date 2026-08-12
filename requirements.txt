@@ -1,0 +1,8 @@
+numpy
+pandas
+scipy
+tqdm
+visualdl
+hnswlib
+paddlepaddle==2.6.2
+paddlenlp

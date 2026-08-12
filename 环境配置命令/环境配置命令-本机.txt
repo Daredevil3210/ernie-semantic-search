@@ -1,0 +1,32 @@
+换源：
+
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/
+
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
+
+conda config --set show_channel_urls yes 
+
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+
+进入创建的search环境：
+
+conda deactivate
+
+conda activate search
+
+
+配置环境（安装依赖包）：
+
+pip install numpy
+
+GPU版本（根据cuda版本选择）：
+python -m pip install paddlepaddle-gpu==2.6.2.post120 -i https://www.paddlepaddle.org.cn/packages/stable/cu120/
+CPU版本：
+pip install paddlepaddle==2.6.2 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+
+pip install paddlenlp
+
+pip install hnswlib
+
+pip install ipykernel

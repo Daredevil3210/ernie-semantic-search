@@ -1,0 +1,2 @@
+1. train_pairwise: 训练一个排序模型，并在最后进行评估
+2. predict_pairwise: 利用训练好的模型，对测试集进行排序

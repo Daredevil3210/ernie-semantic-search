@@ -1,0 +1,31 @@
+# Python cache and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.conda/
+
+# Notebook and editor state
+.ipynb_checkpoints/
+.idea/
+.vscode/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Runtime outputs
+*.log
+result.tsv
+recall_result.*
+
+# Large generated artifacts (rebuild or provide separately)
+*.pdparams
+*.bin
+rank/rank_dataset/train_pairwise.csv
+recall/recall_dataset/corpus.csv
+
+# Personal interview notes: keep local, do not publish
+复试问答.docx

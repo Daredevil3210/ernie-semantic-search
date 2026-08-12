@@ -1,0 +1,4 @@
+1. finetune.ipynb 利用literature_search_data数据集进行微调
+2. recall.ipynb 对测试集query进行召回
+3. evaluate.ipynb 对召回的数据计算recall@N
+	在执行evaluate.ipynb的过程中生成的result.tsv 记录recall@1, 5, 10, 20, 50的值

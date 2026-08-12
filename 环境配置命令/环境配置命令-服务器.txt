@@ -1,0 +1,38 @@
+安装conda：
+
+mkdir miniconda
+
+cd miniconda
+
+wget https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-x86_64.sh
+
+bash Miniconda3-latest-Linux-x86_64.sh
+
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/
+
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
+
+conda config --set show_channel_urls yes 
+
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+
+创建conda环境：
+
+conda create --name search python==3.10
+
+
+配置环境（安装依赖包）：
+
+pip install numpy
+
+GPU版本（根据cuda版本选择）：
+python -m pip install paddlepaddle-gpu==2.6.2.post112 -i https://www.paddlepaddle.org.cn/packages/stable/cu112/
+CPU版本：
+pip install paddlepaddle==2.6.2 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+
+pip install paddlenlp
+
+pip install hnswlib
+
+pip install ipykernel
