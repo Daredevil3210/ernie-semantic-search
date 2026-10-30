@@ -1,93 +1,115 @@
-# 基于 ERNIE 的语义检索与排序系统
+[English](README.md) | [简体中文](README.zh.md)
 
-这是一个基于 PaddlePaddle / PaddleNLP 实现的中文文献语义搜索项目。系统采用“两阶段检索”结构：先通过语义向量与 HNSW 索引召回候选文献，再使用 Pairwise Matching 模型进行精排。
+# ERNIE Semantic Search and Ranking
 
-## 项目组成
+An educational Chinese literature-search pipeline built with PaddlePaddle/PaddleNLP. It retrieves candidate titles using dense ERNIE embeddings and an HNSW index, then scores query–title pairs with a pairwise ranker.
 
-- `recall/`：召回模型微调、向量索引构建、召回测试与 Recall@N 评估。
-- `rank/`：Pairwise 排序模型训练、预测与评估。
-- `search_system/`：组合召回与排序模块的完整搜索流程。
-- `环境配置命令/`：本机和服务器环境配置参考。
-- `GPU服务器bug修复/`：GPU 服务器依赖导入问题的排查资料。
+The repository contains experiment notebooks, Python exports, supporting modules, and some datasets. Trained parameters, vector indexes, and the complete ranking training set are excluded. It is not a ready-to-run hosted search service; reproduction requires preparing artifacts and reviewing the configuration points below.
 
-## 技术路线
+## Architecture and learning scope
 
-1. 使用 ERNIE-1.0 将查询和文献编码为稠密向量。
-2. 使用 HNSW 建立近似最近邻索引并召回候选文献。
-3. 使用 ERNIE-3.0-medium-zh 训练 Pairwise Matching 模型。
-4. 对召回结果计算相关性分数并重新排序。
+1. **Dense retrieval:** fine-tune `ernie-1.0` with in-batch negatives and encode text into normalized 256-dimensional embeddings.
+2. **Candidate search:** use hnswlib with inner-product distance to retrieve 50 candidates.
+3. **Pairwise ranking:** train `ernie-3.0-medium-zh` with a margin ranking loss and evaluate development AUC.
+4. **Combined search:** accept a query, retrieve titles, score pairs, and sort by predicted relevance.
 
-## 环境要求
+```text
+recall/              Fine-tuning, indexing, retrieval, Recall@N
+rank/                Pairwise training, AUC evaluation, prediction
+search_system/       Combined interactive retrieval and ranking
+环境配置命令/         Original local/server environment notes
+GPU服务器bug修复/     Original GPU import troubleshooting materials
+```
 
-建议使用 Python 3.10，并在独立的 Conda 环境中运行。
+The `.ipynb` files retain the experiment workflow; their `.py` counterparts contain cell-style executable sections. They are not configurable command-line interfaces despite some imported argument-parsing modules.
+
+## Environment
+
+Original setup notes use Python 3.10. The dependency file pins CPU PaddlePaddle to 2.6.2 but leaves PaddleNLP and other packages unpinned, so it is not a fully reproducible lockfile.
 
 ```bash
 conda create -n search python=3.10
 conda activate search
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-`requirements.txt` 默认安装 CPU 版 PaddlePaddle。GPU 环境请根据 CUDA 版本，参考 `环境配置命令/环境配置命令-本机.txt` 中的命令安装对应版本。
+Notebook use additionally requires Jupyter and a kernel in this environment. First use of `from_pretrained` requires access to model downloads or an existing local cache. GPU setup commands in `环境配置命令/` are historical references; choose a compatible Paddle/CUDA installation for your machine. Several scripts explicitly call `paddle.set_device("cpu")`; installing a GPU package alone does not switch them to GPU.
 
-## 使用方法
+## Data and artifact prerequisites
 
-### 1. 训练召回模型
+Although named `.csv`, the text-pair readers use **tab-separated** fields:
 
-在 `recall/` 目录中按顺序运行：
+- Retrieval training/development pairs: query and matching title; the reader in `recall/finetune.py` expects two fields without header handling.
+- Retrieval corpus: one title/text per line. Line order determines index IDs.
+- Ranking training: query, positive title, negative title; the training reader skips the first line as a header.
+- Ranking development: query, title, label; its reader also skips the header.
+- Ranking prediction: the reader requires three fields and uses the first two as query/title.
+
+The repository tracks retrieval train/dev/test files, ranking dev/test files, and `search_system/corpus.csv`. It does **not** track:
+
+```text
+*.pdparams                              Trained model parameters
+*.bin                                   HNSW indexes
+rank/rank_dataset/train_pairwise.csv     Complete ranking training data
+recall/recall_dataset/corpus.csv         Retrieval-side corpus copy
+```
+
+To use the supplied corpus in retrieval, copy `search_system/corpus.csv` to `recall/recall_dataset/corpus.csv`. Keep its order unchanged between indexing and search. Supply ranking training triples from an authorized source; no download or complete generation procedure is provided. Tokenizer vocabulary/config files in `model_param/` are not trained neural weights.
+
+## Workflow
+
+Run each stage from its own directory so relative imports and data paths resolve. Review the matching notebook for the cell-by-cell explanation.
+
+### 1. Train and evaluate retrieval
 
 ```bash
+cd recall
 python finetune.py
+# Set recall.py's params_path to an actual checkpoint produced above.
 python recall.py
 python evaluate.py
 ```
 
-对应的 Notebook 为 `finetune.ipynb`、`recall.ipynb` 和 `evaluate.ipynb`。
+Prepare the corpus copy before retrieval. Fine-tuning defaults to 3 epochs, learning rate `5e-5`, and checkpoint saving every 10 steps under `model_param/model_<step>/model_state.pdparams`. Retrieval defaults to `model_180`; that checkpoint must exist or the path must change.
 
-### 2. 训练排序模型
+`recall.py` builds `index_file/final_index.bin` and writes development-query candidates to `recall_result_file/recall_result.txt`. Evaluation writes Recall@1/5/10/20/50 to `recall_result_file/result.tsv`. Inspect grouping before relying on the metric: the current evaluation loop does not append its final candidate group.
 
-在 `rank/` 目录中运行：
+### 2. Train and use the ranker
+
+From the repository root:
 
 ```bash
+cd rank
 python train_pairwise.py
 python predict_pairwise.py
 ```
 
-### 3. 运行完整搜索流程
+Prepare the missing ranking training file first. Defaults are 3 epochs, learning rate `2e-5`, and margin 0.1. Training evaluates and saves every 100 steps. Its final evaluation and prediction script both use `model_param/model_400/model_state.pdparams`; update those paths if your run produces different checkpoint steps.
 
-准备召回模型、排序模型和向量索引后，在 `search_system/` 目录运行：
+### 3. Run combined search
+
+Prepare these files under `search_system/`:
+
+```text
+corpus.csv
+final_index.bin
+recall_model_state.pdparams
+rank_model_state.pdparams
+```
+
+Use the retrieval index and its matching checkpoint, plus the ranking checkpoint. Review `search_system/search.py` before running: its `rank_tokenizer` currently loads the retrieval `model_name` (`ernie-1.0`) instead of `rank_model_name` (`ernie-3.0-medium-zh`). Align tokenizer and ranking model before treating results as valid. The export also contains two interactive demonstration sections and may prompt twice.
+
+After resolving these prerequisites, run from the repository root:
 
 ```bash
+cd search_system
 python search.py
 ```
 
-程序会提示输入待查询的文献内容，并输出召回结果及精排后的相关性分数。
+Enter a literature query to see retrieved titles and reranked scores.
 
-## 数据与模型文件
+## Validation, provenance, and rights
 
-GitHub 单文件大小有限制，因此仓库不包含以下本地生成或大体积文件：
+No automated test suite is provided. This documentation update inspected source and file structure without running training, loading weights, or measuring Recall/AUC. Archived outputs and checkpoint step numbers are not independently verified benchmark results.
 
-- `*.pdparams`：训练后的模型参数。
-- `*.bin`：HNSW 向量索引。
-- `rank/rank_dataset/train_pairwise.csv`：完整 Pairwise 训练集。
-- `recall/recall_dataset/corpus.csv`：与搜索模块重复的语料副本。
-
-`search_system/corpus.csv` 保留为召回语料。若要单独运行 `recall/`，可将它复制到 `recall/recall_dataset/corpus.csv`，并根据脚本中的路径配置准备其余模型与索引文件。
-
-## 目录说明
-
-```text
-.
-├── recall/              # 语义召回训练与评估
-├── rank/                # Pairwise 精排训练与预测
-├── search_system/       # 端到端搜索系统
-├── 环境配置命令/         # 环境安装参考
-├── GPU服务器bug修复/     # GPU 环境问题排查资料
-├── requirements.txt
-└── README.md
-```
-
-## 说明
-
-- 项目中的 `.py` 文件可直接运行，`.ipynb` 文件保留了实验过程。
-- 首次运行 PaddleNLP 模型时需要联网下载预训练模型。
-- 大文件和个人复试资料仅保留在本地，不会提交到公开仓库。
+Original environment notes and troubleshooting materials are retained as reference. Data, pretrained models, and third-party materials remain subject to their providers' terms. No repository license file or explicit open-source license grant is declared.
